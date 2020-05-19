@@ -1,4 +1,8 @@
 #source code : https://github.com/rahulvigneswaran/Lottery-Ticket-Hypothesis-in-Pytorch/blob/e03ca8ac4178be3a2bff2b82c858bf5e58dd3967/main.py#L269
+import torch
+import torch.optim as optim
+import numpy as np
+from tqdm import trange
 
 class Lottery_Hypothesis():
 	def __init__(self, net, prune_percent, prune_iter, 
@@ -68,13 +72,12 @@ class Lottery_Hypothesis():
 
 		EPS = 1e-6
 
-
 		self.optimizer = optim.Adam(self.net.parameters(), lr = self.learning_rate)
 
 		avg_losses = []
 		for epoch in range(self.train_epochs):
 			losses = []
-			for step, (x, y) in enumerate(train_loader):
+			for step, (x, y) in enumerate(self.train_loader):
 
 				x = x.to(self.device)
 				y = y.to(self.device)
@@ -99,7 +102,31 @@ class Lottery_Hypothesis():
 		return avg_losses
 
 	def test(self):
-		pass
+		correct = 0
+		cnt = 0
+		for idx, (x, y) in enumerate(self.test_loader):
+			x = x.to(self.device)
+			y = y.to(self.device)
+			x = x.view(-1, 3, 32, 32)
+
+			pred = self.net(x)
+			pred = torch.argmax(pred)
+			if pred==y:
+				correct+=1
+			cnt+=1
+		print('accuracy = %f'%((float)(correct/cnt)))
+
+	def print_prune_percent(self):
+		w_cnt = 0
+		a_cnt = 0
+
+		for m in self.mask:
+			w_cnt += m.size
+			a_cnt += np.count_nonzero(m)
+
+		remain_percent = a_cnt / w_cnt * 100
+		print(f'{remain_percent} remaining')
+
 
 	def prune(self):
 		for step in trange(self.prune_iter):
@@ -107,4 +134,6 @@ class Lottery_Hypothesis():
 			self.train()
 			self.update_mask()
 
+			self.test()
+			self.print_prune_percent()
 		torch.save(self.net.state_dict(self.SAVE_PATH))
